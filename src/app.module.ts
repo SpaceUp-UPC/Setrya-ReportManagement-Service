@@ -5,6 +5,7 @@ import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { HealthModule } from './health/health.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -34,6 +35,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'setrya-reportmanagement-service',
     }),
     HealthModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
