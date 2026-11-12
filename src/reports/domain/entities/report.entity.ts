@@ -62,4 +62,12 @@ export class Report {
       createdAt: new Date(),
     });
   }
+
+  markReady(fileUrl: string): Report {
+    return new Report({ ...this, status: ReportStatus.READY, fileUrl });
+  }
+
+  markFailed(): Report {
+    return new Report({ ...this, status: ReportStatus.FAILED, fileUrl: null });
+  }
 }

@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   NotFoundException,
@@ -7,12 +9,19 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { CreateReportUseCase } from '../../application/use-cases/create-report.use-case.js';
+import { DownloadReportUseCase } from '../../application/use-cases/download-report.use-case.js';
+import { GenerateReportUseCase } from '../../application/use-cases/generate-report.use-case.js';
 import { GetReportByIdUseCase } from '../../application/use-cases/get-report-by-id.use-case.js';
 import { ListReportsUseCase } from '../../application/use-cases/list-reports.use-case.js';
+import { ReportFormatNotSupportedError } from '../../application/errors/report-format-not-supported.error.js';
 import { ReportNotFoundError } from '../../application/errors/report-not-found.error.js';
+import { ReportNotReadyError } from '../../application/errors/report-not-ready.error.js';
 import { CreateReportRequestDto } from '../dto/create-report-request.dto.js';
 import { ListReportsQueryDto } from '../dto/list-reports-query.dto.js';
 import { PaginatedReportsResponseDto } from '../dto/paginated-reports-response.dto.js';
@@ -25,6 +34,8 @@ export class ReportsController {
     private readonly createReportUseCase: CreateReportUseCase,
     private readonly getReportByIdUseCase: GetReportByIdUseCase,
     private readonly listReportsUseCase: ListReportsUseCase,
+    private readonly generateReportUseCase: GenerateReportUseCase,
+    private readonly downloadReportUseCase: DownloadReportUseCase,
   ) {}
 
   @Get()
@@ -70,6 +81,54 @@ export class ReportsController {
     } catch (error) {
       if (error instanceof ReportNotFoundError) {
         throw new NotFoundException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Post(':id/generate')
+  @ApiResponse({ status: 200, type: ReportResponseDto })
+  @ApiResponse({ status: 400, description: 'Report format not supported yet' })
+  @ApiResponse({ status: 404, description: 'Report not found' })
+  async generate(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ReportResponseDto> {
+    try {
+      const report = await this.generateReportUseCase.execute(id);
+      return ReportResponseDto.fromDomain(report);
+    } catch (error) {
+      if (error instanceof ReportNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof ReportFormatNotSupportedError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Get(':id/download')
+  @ApiResponse({ status: 200, description: 'Report file' })
+  @ApiResponse({ status: 404, description: 'Report not found' })
+  @ApiResponse({ status: 409, description: 'Report is not ready for download' })
+  async download(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    try {
+      const { stream, filename, contentType } =
+        await this.downloadReportUseCase.execute(id);
+      res.set({
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      });
+      return new StreamableFile(stream);
+    } catch (error) {
+      if (error instanceof ReportNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof ReportNotReadyError) {
+        throw new ConflictException(error.message);
       }
       throw error;
     }
