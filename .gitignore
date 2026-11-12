@@ -53,6 +53,9 @@ lerna-debug.log*
 .temp
 .tmp
 
+# generated report files
+/storage/reports
+
 # Runtime data
 pids
 *.pid
