@@ -1,0 +1,332 @@
+openapi: 3.0.3
+info:
+  title: Sentrya - IoT Monitoring and Notifications
+  version: 0.2.0
+  description: >
+    Recepción de lecturas IoT, detección de valores fuera de rango y gestión de alertas.
+    Las rutas /api/v1 requieren el JWT que emite el microservicio IAM.
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Estado del servicio
+      security: []
+      responses:
+        "200": { description: OK }
+  /api/v1/devices:
+    post:
+      summary: Registrar un dispositivo (inactivo salvo que se envíe active true)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterDevice" }
+      responses:
+        "201":
+          description: Dispositivo creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Device" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/devices/{deviceId}/activate:
+    patch:
+      summary: Activar un dispositivo
+      parameters: [{ $ref: "#/components/parameters/deviceId" }]
+      responses:
+        "200":
+          description: Dispositivo activado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Device" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/devices/{deviceId}/deactivate:
+    patch:
+      summary: Desactivar un dispositivo
+      parameters: [{ $ref: "#/components/parameters/deviceId" }]
+      responses:
+        "200":
+          description: Dispositivo desactivado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Device" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/readings:
+    post:
+      summary: Ingresar una lectura de un dispositivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IngestReading" }
+      responses:
+        "200":
+          description: Lectura repetida (mismo readingId); devuelve lo ya guardado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IngestResult" }
+        "201":
+          description: Lectura registrada; incluye la alerta si generó una
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IngestResult" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/spaces/{spaceId}/readings:
+    get:
+      summary: Lecturas de un espacio (más recientes primero)
+      parameters:
+        - { $ref: "#/components/parameters/spaceId" }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 1000 } }
+      responses:
+        "200":
+          description: Lecturas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Reading" }
+  /api/v1/spaces/{spaceId}/devices:
+    get:
+      summary: Dispositivos de un espacio
+      parameters: [{ $ref: "#/components/parameters/spaceId" }]
+      responses:
+        "200":
+          description: Dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Device" }
+  /api/v1/spaces/{spaceId}/alerts:
+    get:
+      summary: Alertas de un espacio
+      parameters:
+        - { $ref: "#/components/parameters/spaceId" }
+        - { name: status, in: query, schema: { type: string, enum: [created, sent, acknowledged, closed] } }
+      responses:
+        "200":
+          description: Alertas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Alert" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/v1/spaces/{spaceId}/monitoring-summary:
+    get:
+      summary: Resumen del monitoreo de un espacio
+      parameters: [{ $ref: "#/components/parameters/spaceId" }]
+      responses:
+        "200":
+          description: Resumen
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitoringSummary" }
+  /api/v1/alerts/{alertId}/acknowledge:
+    patch:
+      summary: Reconocer una alerta
+      parameters: [{ $ref: "#/components/parameters/alertId" }]
+      responses:
+        "200":
+          description: Alerta reconocida
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alert" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/alerts/{alertId}/close:
+    patch:
+      summary: Cerrar una alerta
+      parameters: [{ $ref: "#/components/parameters/alertId" }]
+      responses:
+        "200":
+          description: Alerta cerrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alert" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/alerts/{alertId}/validation:
+    post:
+      summary: Confirmar o rechazar una intrusión
+      description: >
+        Publica la decisión al Edge. confirm reconoce la alerta (el Edge escala a
+        autoridades); reject la cierra (el Edge apaga la sirena).
+      parameters: [{ $ref: "#/components/parameters/alertId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [confirm, reject] }
+      responses:
+        "200":
+          description: Decisión enviada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alert" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /api/v1/spaces/{spaceId}/commands/{target}:
+    post:
+      summary: Enviar una orden a un actuador del Edge
+      parameters:
+        - { $ref: "#/components/parameters/spaceId" }
+        - name: target
+          in: path
+          required: true
+          description: deviceId registrado o nombre del actuador (valve, lock, humidifier)
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, example: open }
+                params: { type: object, additionalProperties: true }
+      responses:
+        "202":
+          description: Orden publicada en el broker
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  commandId: { type: string }
+                  target: { type: string }
+                  action: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /api/v1/spaces/{spaceId}/edge-config:
+    put:
+      summary: Enviar umbrales al Edge
+      description: El cuerpo es el árbol de umbrales del perfil del Edge (puede ser parcial).
+      parameters: [{ $ref: "#/components/parameters/spaceId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "202": { description: Configuración publicada en el broker }
+        "400": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    spaceId: { name: spaceId, in: path, required: true, schema: { type: string } }
+    deviceId: { name: deviceId, in: path, required: true, schema: { type: string } }
+    alertId: { name: alertId, in: path, required: true, schema: { type: string } }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties: { error: { type: string } }
+  schemas:
+    MetricType:
+      type: string
+      enum: [temperature, humidity, voltage, sound, intrusion, escalation, device_error]
+    Threshold:
+      type: object
+      required: [metricType, minValue, maxValue]
+      properties:
+        metricType: { $ref: "#/components/schemas/MetricType" }
+        minValue: { type: number }
+        maxValue: { type: number }
+        unit: { type: string }
+    RegisterDevice:
+      type: object
+      required: [spaceId, name]
+      properties:
+        id: { type: string, description: "Opcional. Id acordado con el Edge, ej. space1-temperature" }
+        spaceId: { type: string }
+        name: { type: string }
+        active: { type: boolean, default: false }
+        thresholds:
+          type: array
+          items: { $ref: "#/components/schemas/Threshold" }
+    Device:
+      type: object
+      properties:
+        id: { type: string }
+        spaceId: { type: string }
+        name: { type: string }
+        active: { type: boolean }
+        thresholds:
+          type: array
+          items: { $ref: "#/components/schemas/Threshold" }
+        createdAt: { type: string, format: date-time }
+    IngestReading:
+      type: object
+      required: [deviceId, metricType, value, unit]
+      properties:
+        deviceId: { type: string }
+        metricType: { $ref: "#/components/schemas/MetricType" }
+        value: { type: number }
+        unit: { type: string, description: "C, %, V, dB o event" }
+        readingId: { type: string, description: "Opcional. Permite descartar reenvíos" }
+        measuredAt: { type: string, format: date-time }
+        localState: { type: string, enum: [NORMAL, WARNING, CRITICAL] }
+        reason: { type: string }
+        eventId: { type: string }
+        evidenceRef: { type: string }
+    Reading:
+      type: object
+      properties:
+        id: { type: string }
+        deviceId: { type: string }
+        metricType: { $ref: "#/components/schemas/MetricType" }
+        value: { type: number }
+        unit: { type: string }
+        receivedAt: { type: string, format: date-time }
+        status: { type: string, enum: [received, validated, out_of_range] }
+        measuredAt: { type: string, format: date-time }
+        localState: { type: string, enum: [NORMAL, WARNING, CRITICAL] }
+    Alert:
+      type: object
+      properties:
+        id: { type: string }
+        readingId: { type: string }
+        deviceId: { type: string }
+        spaceId: { type: string }
+        metricType: { $ref: "#/components/schemas/MetricType" }
+        message: { type: string }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        status: { type: string, enum: [created, sent, acknowledged, closed] }
+        createdAt: { type: string, format: date-time }
+        acknowledgedAt: { type: string, format: date-time }
+        closedAt: { type: string, format: date-time }
+        reason: { type: string }
+        eventId: { type: string }
+        evidenceRef: { type: string }
+    IngestResult:
+      type: object
+      properties:
+        reading: { $ref: "#/components/schemas/Reading" }
+        alert: { $ref: "#/components/schemas/Alert" }
+        duplicate: { type: boolean }
+    MonitoringSummary:
+      type: object
+      properties:
+        spaceId: { type: string }
+        recentReadings: { type: integer }
+        activeAlerts: { type: integer }
+        status: { type: string, enum: [normal, attention] }

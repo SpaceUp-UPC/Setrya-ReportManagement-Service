@@ -3,7 +3,7 @@ import type { ReportType } from '../enums/report-type.enum.js';
 export interface HomeHistoryRow {
   timestamp: Date;
   temperature: number;
-  humidity: number;
+  humidity: number | null;
 }
 
 export interface DeviceServiceEntryRow {
