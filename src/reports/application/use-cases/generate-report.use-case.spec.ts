@@ -77,12 +77,43 @@ describe('GenerateReportUseCase', () => {
     );
   });
 
-  it('throws when the report format is not CSV', async () => {
+  it('generates a PDF file and marks the report READY', async () => {
     const pending = buildPendingReport(ReportFormat.PDF);
     vi.mocked(reportRepository.findById).mockResolvedValue(pending);
+    vi.mocked(reportFileStorage.save).mockResolvedValue(
+      '/storage/reports/report.pdf',
+    );
+
+    const result = await useCase.execute(pending.id);
+
+    const [, buffer, format] = vi.mocked(reportFileStorage.save).mock.calls[0];
+    expect(format).toBe(ReportFormat.PDF);
+    expect(buffer.subarray(0, 4).toString('latin1')).toBe('%PDF');
+    expect(result.status).toBe(ReportStatus.READY);
+    expect(result.fileUrl).toBe('/storage/reports/report.pdf');
+  });
+
+  it('throws when the report format does not exist', async () => {
+    const pending = buildPendingReport();
+    const unknown = Object.assign(Object.create(Object.getPrototypeOf(pending)), pending, {
+      format: 'DOCX',
+    }) as Report;
+    vi.mocked(reportRepository.findById).mockResolvedValue(unknown);
 
     await expect(useCase.execute(pending.id)).rejects.toThrow(
       ReportFormatNotSupportedError,
+    );
+  });
+
+  it('marks the report FAILED when PDF generation fails', async () => {
+    const pending = buildPendingReport(ReportFormat.PDF);
+    vi.mocked(reportRepository.findById).mockResolvedValue(pending);
+    vi.mocked(reportFileStorage.save).mockRejectedValue(new Error('disk full'));
+
+    await expect(useCase.execute(pending.id)).rejects.toThrow('disk full');
+
+    expect(reportRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ status: ReportStatus.FAILED }),
     );
   });
 

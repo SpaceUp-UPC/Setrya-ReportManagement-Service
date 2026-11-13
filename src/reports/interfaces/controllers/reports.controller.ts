@@ -88,7 +88,7 @@ export class ReportsController {
 
   @Post(':id/generate')
   @ApiResponse({ status: 200, type: ReportResponseDto })
-  @ApiResponse({ status: 400, description: 'Report format not supported yet' })
+  @ApiResponse({ status: 400, description: 'Report format not supported' })
   @ApiResponse({ status: 404, description: 'Report not found' })
   async generate(
     @Param('id', ParseUUIDPipe) id: string,
@@ -108,7 +108,10 @@ export class ReportsController {
   }
 
   @Get(':id/download')
-  @ApiResponse({ status: 200, description: 'Report file' })
+  @ApiResponse({
+    status: 200,
+    description: 'Report file (text/csv or application/pdf)',
+  })
   @ApiResponse({ status: 404, description: 'Report not found' })
   @ApiResponse({ status: 409, description: 'Report is not ready for download' })
   async download(
