@@ -19,6 +19,11 @@ export interface ReportDataRequest {
   spaceId: string;
   periodStart: Date;
   periodEnd: Date;
+  /**
+   * The caller's Authorization header, forwarded to upstream services that
+   * require a token. It is only passed through, never stored.
+   */
+  authorization?: string;
 }
 
 export const REPORT_DATA_PROVIDER = Symbol('REPORT_DATA_PROVIDER');

@@ -120,6 +120,28 @@ describe('IotMonitoringReportDataProvider', () => {
     ]);
   });
 
+  it('forwards the caller Authorization header to IoT Monitoring', async () => {
+    vi.mocked(httpService.get).mockReturnValue(of({ data: [] } as any));
+
+    await provider.getRows(buildRequest({ authorization: 'Bearer caller-token' }));
+
+    expect(httpService.get).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/spaces/space-1/readings'),
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer caller-token' },
+      }),
+    );
+  });
+
+  it('sends no Authorization header when the caller has none', async () => {
+    vi.mocked(httpService.get).mockReturnValue(of({ data: [] } as any));
+
+    await provider.getRows(buildRequest());
+
+    const [, options] = vi.mocked(httpService.get).mock.calls[0];
+    expect(options?.headers).toBeUndefined();
+  });
+
   it('throws IotMonitoringUnavailableError when the HTTP call fails', async () => {
     vi.mocked(httpService.get).mockReturnValue(
       throwError(() => new Error('network error')),

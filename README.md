@@ -70,6 +70,27 @@ $ npm run test:e2e
 - The `reports` table is truncated between tests, and the files the tests generate under `storage/reports` are removed.
 - They always use the mock data provider (`DATA_PROVIDER=mock`), regardless of `.env`, so they never call other services or the network.
 
+## Authentication
+
+Every route under `/api/v1` requires a `Authorization: Bearer <jwt>` header, except `GET /api/v1/health` and the Swagger UI (`/api/docs`). Tokens are issued by the IAM service and signed with a secret shared with this service; this service never issues tokens.
+
+- Only `HS256`, `HS384` and `HS512` are accepted (`none` and anything else is rejected).
+- The signature, `exp` (required) and `nbf` (if present) are checked, and `sub` must be a non-empty string. `sub` is the authenticated user id.
+- A missing or invalid token gets `401` with a JSON error body.
+- `POST /api/v1/reports` takes the report's `requesterId` from the token's `sub`; it is not part of the request body.
+- For `HOME_HISTORY` reports, the caller's `Authorization` header is forwarded to IoT Monitoring. It is passed through the request and never stored.
+
+| Variable | Description |
+| --- | --- |
+| `JWT_SECRET` | Secret shared with IAM. **Required**: the app refuses to start without it unless `AUTH_DISABLED=true`. Treated as raw text. |
+| `JWT_SECRET_BASE64` | Set to `true` to Base64-decode `JWT_SECRET` before use (IAM's exact encoding is not confirmed). Default `false`. |
+| `AUTH_DISABLED` | Set to `true` to skip authentication. Default `false`. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins (`*` allows any). Empty disables CORS. Allowed headers: `Authorization`, `Content-Type`. |
+
+> **Warning:** `AUTH_DISABLED=true` is for local development only. It turns authentication off completely: anyone can call the API, and the requester is read from a `requesterId` UUID field in the create-report body. It must **never** be `true` in a deployment. The app logs a warning at startup when it is on.
+
+In Swagger (`/api/docs`), use the **Authorize** button and paste the token.
+
 ## Run with Docker
 
 Builds the service image and starts it alongside PostgreSQL, running migrations automatically on startup.

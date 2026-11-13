@@ -16,6 +16,7 @@ async function bootstrap() {
       'Generates and delivers installation, maintenance and home history reports as PDF or CSV.',
     )
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const swaggerDocument = () =>
     SwaggerModule.createDocument(app, swaggerConfig);
