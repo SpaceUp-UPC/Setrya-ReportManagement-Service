@@ -57,6 +57,19 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+### End-to-end tests
+
+The e2e tests start the real app against a real PostgreSQL and exercise the report flow over HTTP (create, get, list, generate, download). Start the database first:
+
+```bash
+$ docker compose up -d postgres
+$ npm run test:e2e
+```
+
+- They use a separate database, `report_management_test` (override with `E2E_DB_NAME`), on the same server configured in `.env`. It is created if missing and migrated with the existing migrations before the tests run.
+- The `reports` table is truncated between tests, and the files the tests generate under `storage/reports` are removed.
+- They always use the mock data provider (`DATA_PROVIDER=mock`), regardless of `.env`, so they never call other services or the network.
+
 ## Run with Docker
 
 Builds the service image and starts it alongside PostgreSQL, running migrations automatically on startup.
