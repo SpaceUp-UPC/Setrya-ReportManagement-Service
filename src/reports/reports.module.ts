@@ -1,6 +1,7 @@
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CreateReportUseCase } from './application/use-cases/create-report.use-case.js';
 import { DownloadReportUseCase } from './application/use-cases/download-report.use-case.js';
@@ -19,6 +20,7 @@ import { IotMonitoringReportDataProvider } from './infrastructure/providers/iot-
 import { MockReportDataProvider } from './infrastructure/providers/mock-report-data-provider.js';
 import { LocalFileReportStorage } from './infrastructure/storage/local-file-report-storage.js';
 import { ReportsController } from './interfaces/controllers/reports.controller.js';
+import { IotMonitoringUnavailableFilter } from './interfaces/filters/iot-monitoring-unavailable.filter.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ReportOrmEntity]), HttpModule],
@@ -33,6 +35,7 @@ import { ReportsController } from './interfaces/controllers/reports.controller.j
     { provide: REPORT_FILE_STORAGE, useClass: LocalFileReportStorage },
     MockReportDataProvider,
     IotMonitoringReportDataProvider,
+    { provide: APP_FILTER, useClass: IotMonitoringUnavailableFilter },
     {
       provide: REPORT_DATA_PROVIDER,
       useFactory: (
