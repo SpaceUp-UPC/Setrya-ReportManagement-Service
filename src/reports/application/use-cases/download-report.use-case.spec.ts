@@ -12,14 +12,14 @@ describe('DownloadReportUseCase', () => {
   let reportFileStorage: ReportFileStorage;
   let useCase: DownloadReportUseCase;
 
-  function buildPendingReport(): Report {
+  function buildPendingReport(format: ReportFormat = ReportFormat.CSV): Report {
     return Report.createPending({
       type: ReportType.HOME_HISTORY,
       requesterId: 'requester-1',
       spaceId: 'space-1',
       periodStart: new Date('2026-01-01'),
       periodEnd: new Date('2026-01-03'),
-      format: ReportFormat.CSV,
+      format,
     });
   }
 
@@ -47,6 +47,18 @@ describe('DownloadReportUseCase', () => {
       `home_history-report-${ready.id}.csv`,
     );
     expect(result.contentType).toBe('text/csv');
+  });
+
+  it('returns application/pdf and a .pdf filename for a PDF report', async () => {
+    const ready = buildPendingReport(ReportFormat.PDF).markReady(
+      '/storage/reports/report.pdf',
+    );
+    vi.mocked(reportRepository.findById).mockResolvedValue(ready);
+
+    const result = await useCase.execute(ready.id);
+
+    expect(result.filename).toBe(`home_history-report-${ready.id}.pdf`);
+    expect(result.contentType).toBe('application/pdf');
   });
 
   it('throws when the report does not exist', async () => {

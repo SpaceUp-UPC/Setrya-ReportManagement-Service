@@ -14,6 +14,7 @@ import {
   type ReportRepository,
 } from '../../domain/repositories/report.repository.js';
 import { buildReportCsv } from '../csv/report-csv-builder.js';
+import { buildReportPdf } from '../pdf/report-pdf-builder.js';
 import { ReportFormatNotSupportedError } from '../errors/report-format-not-supported.error.js';
 import { ReportNotFoundError } from '../errors/report-not-found.error.js';
 
@@ -34,7 +35,7 @@ export class GenerateReportUseCase {
       throw new ReportNotFoundError(id);
     }
 
-    if (report.format !== ReportFormat.CSV) {
+    if (report.format !== ReportFormat.CSV && report.format !== ReportFormat.PDF) {
       throw new ReportFormatNotSupportedError(report.format);
     }
 
@@ -45,7 +46,17 @@ export class GenerateReportUseCase {
         periodStart: report.periodStart,
         periodEnd: report.periodEnd,
       });
-      const buffer = buildReportCsv(report.type, rows);
+      const buffer =
+        report.format === ReportFormat.PDF
+          ? await buildReportPdf({
+              type: report.type,
+              spaceId: report.spaceId,
+              periodStart: report.periodStart,
+              periodEnd: report.periodEnd,
+              generatedAt: new Date(),
+              rows,
+            })
+          : buildReportCsv(report.type, rows);
       const fileUrl = await this.reportFileStorage.save(
         report.id,
         buffer,
