@@ -18,6 +18,11 @@ import { buildReportPdf } from '../pdf/report-pdf-builder.js';
 import { ReportFormatNotSupportedError } from '../errors/report-format-not-supported.error.js';
 import { ReportNotFoundError } from '../errors/report-not-found.error.js';
 
+export interface GenerateReportContext {
+  /** The caller's Authorization header, forwarded to the data provider only. */
+  authorization?: string;
+}
+
 @Injectable()
 export class GenerateReportUseCase {
   constructor(
@@ -29,7 +34,10 @@ export class GenerateReportUseCase {
     private readonly reportFileStorage: ReportFileStorage,
   ) {}
 
-  async execute(id: string): Promise<Report> {
+  async execute(
+    id: string,
+    context: GenerateReportContext = {},
+  ): Promise<Report> {
     const report = await this.reportRepository.findById(id);
     if (!report) {
       throw new ReportNotFoundError(id);
@@ -45,6 +53,7 @@ export class GenerateReportUseCase {
         spaceId: report.spaceId,
         periodStart: report.periodStart,
         periodEnd: report.periodEnd,
+        authorization: context.authorization,
       });
       const buffer =
         report.format === ReportFormat.PDF

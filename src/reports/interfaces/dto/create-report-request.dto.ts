@@ -10,10 +10,6 @@ export class CreateReportRequestDto {
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
-  requesterId: string;
-
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
   spaceId: string;
 
   @ApiProperty({ format: 'date-time' })

@@ -7,6 +7,7 @@ import type { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
+import { signToken } from './support/jwt.js';
 
 const BASE = '/api/v1/reports';
 const BOM = '﻿';
@@ -22,7 +23,6 @@ interface ReportBody {
 function payload(overrides: Record<string, unknown> = {}) {
   return {
     type: 'HOME_HISTORY',
-    requesterId: randomUUID(),
     spaceId: randomUUID(),
     periodStart: '2026-01-01T00:00:00.000Z',
     periodEnd: '2026-01-04T00:00:00.000Z',
@@ -45,7 +45,13 @@ describe('Reports (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
 
-  const http = () => request(app.getHttpServer());
+  // The authenticated user: becomes the requesterId of the reports it creates.
+  const userId = randomUUID();
+  let token: string;
+
+  const http = () =>
+    request.agent(app.getHttpServer()).set('Authorization', `Bearer ${token}`);
+  const anonymous = () => request(app.getHttpServer());
 
   async function createReport(
     overrides: Record<string, unknown> = {},
@@ -55,6 +61,7 @@ describe('Reports (e2e)', () => {
   }
 
   beforeAll(async () => {
+    token = await signToken({ sub: userId });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -86,7 +93,7 @@ describe('Reports (e2e)', () => {
       expect(res.body).toMatchObject({
         type: 'MAINTENANCE',
         spaceId: body.spaceId,
-        requesterId: body.requesterId,
+        requesterId: userId,
         format: 'PDF',
         status: 'PENDING',
         fileUrl: null,
@@ -101,15 +108,93 @@ describe('Reports (e2e)', () => {
         .expect(400);
     });
 
-    it.each(['spaceId', 'requesterId'])(
-      'rejects an invalid UUID in %s with 400',
-      async (field) => {
-        await http()
-          .post(BASE)
-          .send(payload({ [field]: 'not-a-uuid' }))
-          .expect(400);
+    it('rejects an invalid spaceId with 400', async () => {
+      await http()
+        .post(BASE)
+        .send(payload({ spaceId: 'not-a-uuid' }))
+        .expect(400);
+    });
+
+    it('takes requesterId from the token and ignores one sent in the body', async () => {
+      const res = await http()
+        .post(BASE)
+        .send(payload({ requesterId: randomUUID() }))
+        .expect(201);
+
+      expect(res.body.requesterId).toBe(userId);
+    });
+
+    it('uses the sub of whichever token is presented', async () => {
+      const otherUser = randomUUID();
+      const otherToken = await signToken({ sub: otherUser, alg: 'HS512' });
+
+      const res = await anonymous()
+        .post(BASE)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .send(payload())
+        .expect(201);
+
+      expect(res.body.requesterId).toBe(otherUser);
+    });
+  });
+
+  describe('authentication', () => {
+    it('keeps GET /health public', async () => {
+      const res = await anonymous().get('/api/v1/health').expect(200);
+
+      expect(res.body).toEqual({ status: 'ok' });
+    });
+
+    it.each([
+      ['GET', BASE],
+      ['POST', BASE],
+      ['GET', `${BASE}/${randomUUID()}`],
+      ['POST', `${BASE}/${randomUUID()}/generate`],
+      ['GET', `${BASE}/${randomUUID()}/download`],
+    ])(
+      'returns 401 with a JSON body for %s %s without a token',
+      async (method, url) => {
+        const res = await anonymous()[method === 'GET' ? 'get' : 'post'](url);
+
+        expect(res.status).toBe(401);
+        expect(res.headers['content-type']).toContain('application/json');
+        expect(res.body).toMatchObject({ statusCode: 401 });
       },
     );
+
+    it('does not create a report without a token', async () => {
+      await anonymous().post(BASE).send(payload()).expect(401);
+
+      const rows: unknown[] = await dataSource.query('SELECT 1 FROM reports');
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 401 for a token signed with another secret', async () => {
+      const forged = await signToken({
+        secret: 'some-other-secret-0123456789abcdef',
+      });
+
+      await anonymous()
+        .get(BASE)
+        .set('Authorization', `Bearer ${forged}`)
+        .expect(401);
+    });
+
+    it('returns 401 for an expired token', async () => {
+      const expired = await signToken({ expiresInSeconds: -60 });
+
+      await anonymous()
+        .get(BASE)
+        .set('Authorization', `Bearer ${expired}`)
+        .expect(401);
+    });
+
+    it('returns 401 for a malformed token', async () => {
+      await anonymous()
+        .get(BASE)
+        .set('Authorization', 'Bearer not.a.jwt')
+        .expect(401);
+    });
   });
 
   describe('GET /reports/:id', () => {

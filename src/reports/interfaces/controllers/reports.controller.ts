@@ -12,8 +12,9 @@ import {
   Res,
   StreamableFile,
 } from '@nestjs/common';
-import { ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { Auth, type AuthContext } from '../../../auth/auth-context.js';
 import { CreateReportUseCase } from '../../application/use-cases/create-report.use-case.js';
 import { DownloadReportUseCase } from '../../application/use-cases/download-report.use-case.js';
 import { GenerateReportUseCase } from '../../application/use-cases/generate-report.use-case.js';
@@ -28,6 +29,8 @@ import { PaginatedReportsResponseDto } from '../dto/paginated-reports-response.d
 import { ReportResponseDto } from '../dto/report-response.dto.js';
 
 @ApiTags('reports')
+@ApiBearerAuth()
+@ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
 @Controller('reports')
 export class ReportsController {
   constructor(
@@ -54,13 +57,29 @@ export class ReportsController {
   }
 
   @Post()
+  @ApiOperation({
+    description:
+      'The requester is the authenticated user (the `sub` claim of the bearer token). ' +
+      'Only when the service runs with AUTH_DISABLED=true (local development), ' +
+      'the requester is read from a `requesterId` UUID field in the body instead.',
+  })
   @ApiResponse({ status: 201, type: ReportResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid body, or no requesterId when authentication is disabled',
+  })
   async create(
     @Body() body: CreateReportRequestDto,
+    @Auth() auth: AuthContext,
   ): Promise<ReportResponseDto> {
+    if (!auth.userId) {
+      throw new BadRequestException(
+        'requesterId must be a UUID when authentication is disabled',
+      );
+    }
     const report = await this.createReportUseCase.execute({
       type: body.type,
-      requesterId: body.requesterId,
+      requesterId: auth.userId,
       spaceId: body.spaceId,
       periodStart: new Date(body.periodStart),
       periodEnd: new Date(body.periodEnd),
@@ -92,9 +111,12 @@ export class ReportsController {
   @ApiResponse({ status: 404, description: 'Report not found' })
   async generate(
     @Param('id', ParseUUIDPipe) id: string,
+    @Auth() auth: AuthContext,
   ): Promise<ReportResponseDto> {
     try {
-      const report = await this.generateReportUseCase.execute(id);
+      const report = await this.generateReportUseCase.execute(id, {
+        authorization: auth.authorization,
+      });
       return ReportResponseDto.fromDomain(report);
     } catch (error) {
       if (error instanceof ReportNotFoundError) {

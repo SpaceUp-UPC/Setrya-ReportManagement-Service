@@ -36,7 +36,10 @@ export class IotMonitoringReportDataProvider implements ReportDataProvider {
   private async getHomeHistoryRows(
     request: ReportDataRequest,
   ): Promise<HomeHistoryRow[]> {
-    const readings = await this.fetchReadings(request.spaceId);
+    const readings = await this.fetchReadings(
+      request.spaceId,
+      request.authorization,
+    );
 
     const isWithinPeriod = (reading: IotMonitoringReadingDto): boolean => {
       const measuredAt = new Date(reading.measuredAt ?? reading.receivedAt);
@@ -74,13 +77,18 @@ export class IotMonitoringReportDataProvider implements ReportDataProvider {
 
   private async fetchReadings(
     spaceId: string,
+    authorization?: string,
   ): Promise<IotMonitoringReadingDto[]> {
     const baseUrl = this.configService.get<string>('IOT_MONITORING_URL', '');
     try {
       const response = await firstValueFrom(
         this.httpService.get<IotMonitoringReadingDto[]>(
           `${baseUrl}/api/v1/spaces/${spaceId}/readings`,
-          { params: { limit: READINGS_LIMIT }, timeout: REQUEST_TIMEOUT_MS },
+          {
+            params: { limit: READINGS_LIMIT },
+            timeout: REQUEST_TIMEOUT_MS,
+            headers: authorization ? { Authorization: authorization } : undefined,
+          },
         ),
       );
       return response.data;

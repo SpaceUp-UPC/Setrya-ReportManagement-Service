@@ -69,6 +69,19 @@ describe('GenerateReportUseCase', () => {
     expect(result.fileUrl).toBe('/storage/reports/report.csv');
   });
 
+  it('passes the caller authorization to the data provider', async () => {
+    const pending = buildPendingReport();
+    vi.mocked(reportRepository.findById).mockResolvedValue(pending);
+
+    await useCase.execute(pending.id, { authorization: 'Bearer caller-token' });
+
+    expect(reportDataProvider.getRows).toHaveBeenCalledWith(
+      expect.objectContaining({ authorization: 'Bearer caller-token' }),
+    );
+    const saved = vi.mocked(reportRepository.save).mock.calls[0][0];
+    expect(JSON.stringify(saved)).not.toContain('caller-token');
+  });
+
   it('throws when the report does not exist', async () => {
     vi.mocked(reportRepository.findById).mockResolvedValue(null);
 

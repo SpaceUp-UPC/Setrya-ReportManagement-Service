@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AuthModule } from './auth/auth.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 
@@ -38,6 +39,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',
       serviceId: 'setrya-reportmanagement-service',
     }),
+    AuthModule,
     HealthModule,
     ReportsModule,
   ],
