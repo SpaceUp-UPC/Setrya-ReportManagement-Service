@@ -80,6 +80,10 @@ To also remove the database and generated reports volumes:
 $ docker compose down -v
 ```
 
+## Database SSL
+
+The PostgreSQL connection is unencrypted by default. Set `DB_SSL=true` to enable SSL for both the application and the migrations (`src/data-source.ts`). Certificate validation is disabled (`rejectUnauthorized: false`) so managed providers that use their own certificates work. `DB_SSL` defaults to `false`, and the bundled `docker compose` PostgreSQL does not need it.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
