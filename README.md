@@ -91,6 +91,18 @@ Every route under `/api/v1` requires a `Authorization: Bearer <jwt>` header, exc
 
 In Swagger (`/api/docs`), use the **Authorize** button and paste the token.
 
+## IoT Monitoring integration
+
+`HOME_HISTORY` reports read their data from IoT Monitoring when `DATA_PROVIDER=http`.
+
+| Variable | Description |
+| --- | --- |
+| `DATA_PROVIDER` | `mock` (default) or `http` to read from IoT Monitoring. |
+| `IOT_MONITORING_URL` | Base URL of IoT Monitoring. |
+| `IOT_MONITORING_TIMEOUT_MS` | Timeout in milliseconds for each call to IoT Monitoring. Default `30000`. Keep it generous when the upstream runs on a free tier that sleeps. |
+
+If the call fails (timeout, network error, or a non-2xx answer such as a rejected token), `POST /api/v1/reports/:id/generate` returns `502 Bad Gateway` with the message `IoT Monitoring service is unavailable or rejected the request` and, when IoT Monitoring answered, an `upstreamStatus` field. The report is marked `FAILED`. The cause is logged (space id, upstream status, error code such as `ECONNABORTED` or `ENOTFOUND`, and the upstream message); the `Authorization` header is never logged.
+
 ## Run with Docker
 
 Builds the service image and starts it alongside PostgreSQL, running migrations automatically on startup.
