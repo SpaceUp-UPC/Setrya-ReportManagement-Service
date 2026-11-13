@@ -77,7 +77,7 @@ Every route under `/api/v1` requires a `Authorization: Bearer <jwt>` header, exc
 - Only `HS256`, `HS384` and `HS512` are accepted (`none` and anything else is rejected).
 - The signature, `exp` (required) and `nbf` (if present) are checked, and `sub` must be a non-empty string. `sub` is the authenticated user id.
 - A missing or invalid token gets `401` with a JSON error body.
-- `POST /api/v1/reports` takes the report's `requesterId` from the token's `sub`; it is not part of the request body.
+- `POST /api/v1/reports` takes the report's `requesterId` from the token's `sub`; it is not part of the request body. IAM sets `sub` to the user's email, so `requesterId` is a free-form string (stored as `varchar`), not a UUID.
 - For `HOME_HISTORY` reports, the caller's `Authorization` header is forwarded to IoT Monitoring. It is passed through the request and never stored.
 
 | Variable | Description |
@@ -87,7 +87,7 @@ Every route under `/api/v1` requires a `Authorization: Bearer <jwt>` header, exc
 | `AUTH_DISABLED` | Set to `true` to skip authentication. Default `false`. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins (`*` allows any). Empty disables CORS. Allowed headers: `Authorization`, `Content-Type`. |
 
-> **Warning:** `AUTH_DISABLED=true` is for local development only. It turns authentication off completely: anyone can call the API, and the requester is read from a `requesterId` UUID field in the create-report body. It must **never** be `true` in a deployment. The app logs a warning at startup when it is on.
+> **Warning:** `AUTH_DISABLED=true` is for local development only. It turns authentication off completely: anyone can call the API, and the requester is read from a non-empty string `requesterId` field in the create-report body (any string, not necessarily a UUID). It must **never** be `true` in a deployment. The app logs a warning at startup when it is on.
 
 In Swagger (`/api/docs`), use the **Authorize** button and paste the token.
 
