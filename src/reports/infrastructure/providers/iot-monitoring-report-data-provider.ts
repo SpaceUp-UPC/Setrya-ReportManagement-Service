@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { ReportType } from '../../domain/enums/report-type.enum.js';
@@ -9,17 +9,20 @@ import type {
   ReportDataRequest,
   ReportRow,
 } from '../../domain/ports/report-data-provider.port.js';
+import { describeIotMonitoringFailure } from '../clients/iot-monitoring/iot-monitoring-failure.js';
 import type { IotMonitoringReadingDto } from '../clients/iot-monitoring/iot-monitoring-reading.dto.js';
 import { IotMonitoringUnavailableError } from '../errors/iot-monitoring-unavailable.error.js';
 import { MockReportDataProvider } from './mock-report-data-provider.js';
 
-const REQUEST_TIMEOUT_MS = 5000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 const READINGS_LIMIT = 1000;
 const TEMPERATURE_METRIC = 'temperature';
 const HUMIDITY_METRIC = 'humidity';
 
 @Injectable()
 export class IotMonitoringReportDataProvider implements ReportDataProvider {
+  private readonly logger = new Logger(IotMonitoringReportDataProvider.name);
+
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
@@ -86,14 +89,32 @@ export class IotMonitoringReportDataProvider implements ReportDataProvider {
           `${baseUrl}/api/v1/spaces/${spaceId}/readings`,
           {
             params: { limit: READINGS_LIMIT },
-            timeout: REQUEST_TIMEOUT_MS,
+            timeout: this.getTimeoutMs(),
             headers: authorization ? { Authorization: authorization } : undefined,
           },
         ),
       );
       return response.data;
     } catch (error) {
+      // Never log the request config or headers: they carry the caller's token.
+      const { status, code, upstreamMessage, reason } =
+        describeIotMonitoringFailure(error);
+      this.logger.error(
+        `IoT Monitoring request failed: spaceId=${spaceId} status=${status ?? 'none'} ` +
+          `code=${code ?? 'none'} upstreamMessage=${upstreamMessage ?? 'none'} reason=${reason}`,
+      );
       throw new IotMonitoringUnavailableError(spaceId, error);
     }
+  }
+
+  /** IOT_MONITORING_TIMEOUT_MS, falling back to the default when unset or invalid. */
+  private getTimeoutMs(): number {
+    const value = Number(
+      this.configService.get<string | number>(
+        'IOT_MONITORING_TIMEOUT_MS',
+        DEFAULT_TIMEOUT_MS,
+      ),
+    );
+    return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
   }
 }

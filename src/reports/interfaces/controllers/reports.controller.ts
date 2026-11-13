@@ -109,6 +109,13 @@ export class ReportsController {
   @ApiResponse({ status: 200, type: ReportResponseDto })
   @ApiResponse({ status: 400, description: 'Report format not supported' })
   @ApiResponse({ status: 404, description: 'Report not found' })
+  @ApiResponse({
+    status: 502,
+    description:
+      'IoT Monitoring service is unavailable or rejected the request. ' +
+      'The body includes `upstreamStatus` when IoT Monitoring answered. ' +
+      'The report is marked FAILED.',
+  })
   async generate(
     @Param('id', ParseUUIDPipe) id: string,
     @Auth() auth: AuthContext,
