@@ -61,7 +61,7 @@ export class ReportsController {
     description:
       'The requester is the authenticated user (the `sub` claim of the bearer token). ' +
       'Only when the service runs with AUTH_DISABLED=true (local development), ' +
-      'the requester is read from a `requesterId` UUID field in the body instead.',
+      'the requester is read from a non-empty string `requesterId` field in the body instead (any string, not necessarily a UUID).',
   })
   @ApiResponse({ status: 201, type: ReportResponseDto })
   @ApiResponse({
@@ -74,7 +74,7 @@ export class ReportsController {
   ): Promise<ReportResponseDto> {
     if (!auth.userId) {
       throw new BadRequestException(
-        'requesterId must be a UUID when authentication is disabled',
+        'requesterId must be a non-empty string when authentication is disabled',
       );
     }
     const report = await this.createReportUseCase.execute({

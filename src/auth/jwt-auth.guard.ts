@@ -6,7 +6,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { isUUID } from 'class-validator';
 import type { Response } from 'express';
 import { AUTH_CONFIG, type AuthConfig } from './auth.config.js';
 import type { AuthenticatedRequest } from './auth-context.js';
@@ -41,7 +40,7 @@ export class JwtAuthGuard implements CanActivate {
         ?.requesterId;
       request.auth = {
         userId:
-          typeof requesterId === 'string' && isUUID(requesterId)
+          typeof requesterId === 'string' && requesterId.trim() !== ''
             ? requesterId
             : undefined,
         authorization: header,

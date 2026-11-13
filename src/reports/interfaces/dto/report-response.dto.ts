@@ -11,7 +11,11 @@ export class ReportResponseDto {
   @ApiProperty({ enum: ReportType })
   type: ReportType;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({
+    description:
+      "The authenticated user's id (the token's `sub`, e.g. an email); not necessarily a UUID",
+    example: 'user@example.com',
+  })
   requesterId: string;
 
   @ApiProperty({ format: 'uuid' })

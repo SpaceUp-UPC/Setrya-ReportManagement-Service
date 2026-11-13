@@ -209,14 +209,25 @@ describe('JwtAuthGuard', () => {
       });
     });
 
-    it('ignores a body requesterId that is not a UUID', async () => {
+    it('accepts a body requesterId that is not a UUID', async () => {
       const { context, request } = buildContext({
-        body: { requesterId: 'nope' },
+        body: { requesterId: 'user@example.com' },
       });
 
       await disabledGuard.canActivate(context);
 
-      expect(request.auth?.userId).toBeUndefined();
+      expect(request.auth?.userId).toBe('user@example.com');
     });
+
+    it.each(['', '   ', 42, null])(
+      'ignores an empty or non-string body requesterId (%p)',
+      async (requesterId) => {
+        const { context, request } = buildContext({ body: { requesterId } });
+
+        await disabledGuard.canActivate(context);
+
+        expect(request.auth?.userId).toBeUndefined();
+      },
+    );
   });
 });
