@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - '${DB_PORT}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      PORT: ${PORT:-3000}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-false}
+      AUTH_DISABLED: ${AUTH_DISABLED:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      DATA_PROVIDER: ${DATA_PROVIDER:-mock}
+      IOT_MONITORING_URL: ${IOT_MONITORING_URL:-http://localhost:3001}
+      CSV_DELIMITER: ${CSV_DELIMITER:-;}
+    ports:
+      - '${PORT:-3000}:${PORT:-3000}'
+    volumes:
+      - reports_storage:/app/storage/reports
+
+volumes:
+  postgres_data:
+  reports_storage:

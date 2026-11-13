@@ -57,6 +57,67 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+### End-to-end tests
+
+The e2e tests start the real app against a real PostgreSQL and exercise the report flow over HTTP (create, get, list, generate, download). Start the database first:
+
+```bash
+$ docker compose up -d postgres
+$ npm run test:e2e
+```
+
+- They use a separate database, `report_management_test` (override with `E2E_DB_NAME`), on the same server configured in `.env`. It is created if missing and migrated with the existing migrations before the tests run.
+- The `reports` table is truncated between tests, and the files the tests generate under `storage/reports` are removed.
+- They always use the mock data provider (`DATA_PROVIDER=mock`), regardless of `.env`, so they never call other services or the network.
+
+## Authentication
+
+Every route under `/api/v1` requires a `Authorization: Bearer <jwt>` header, except `GET /api/v1/health` and the Swagger UI (`/api/docs`). Tokens are issued by the IAM service and signed with a secret shared with this service; this service never issues tokens.
+
+- Only `HS256`, `HS384` and `HS512` are accepted (`none` and anything else is rejected).
+- The signature, `exp` (required) and `nbf` (if present) are checked, and `sub` must be a non-empty string. `sub` is the authenticated user id.
+- A missing or invalid token gets `401` with a JSON error body.
+- `POST /api/v1/reports` takes the report's `requesterId` from the token's `sub`; it is not part of the request body.
+- For `HOME_HISTORY` reports, the caller's `Authorization` header is forwarded to IoT Monitoring. It is passed through the request and never stored.
+
+| Variable | Description |
+| --- | --- |
+| `JWT_SECRET` | Secret shared with IAM. **Required**: the app refuses to start without it unless `AUTH_DISABLED=true`. Treated as raw text. |
+| `JWT_SECRET_BASE64` | Set to `true` to Base64-decode `JWT_SECRET` before use (IAM's exact encoding is not confirmed). Default `false`. |
+| `AUTH_DISABLED` | Set to `true` to skip authentication. Default `false`. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins (`*` allows any). Empty disables CORS. Allowed headers: `Authorization`, `Content-Type`. |
+
+> **Warning:** `AUTH_DISABLED=true` is for local development only. It turns authentication off completely: anyone can call the API, and the requester is read from a `requesterId` UUID field in the create-report body. It must **never** be `true` in a deployment. The app logs a warning at startup when it is on.
+
+In Swagger (`/api/docs`), use the **Authorize** button and paste the token.
+
+## Run with Docker
+
+Builds the service image and starts it alongside PostgreSQL, running migrations automatically on startup.
+
+```bash
+$ cp .env.example .env
+$ docker compose up --build
+```
+
+The API is then available at `http://localhost:3000/api/v1`, and `http://localhost:3000/api/v1/health` should respond with `{"status":"ok"}`.
+
+To stop the stack:
+
+```bash
+$ docker compose down
+```
+
+To also remove the database and generated reports volumes:
+
+```bash
+$ docker compose down -v
+```
+
+## Database SSL
+
+The PostgreSQL connection is unencrypted by default. Set `DB_SSL=true` to enable SSL for both the application and the migrations (`src/data-source.ts`). Certificate validation is disabled (`rejectUnauthorized: false`) so managed providers that use their own certificates work. `DB_SSL` defaults to `false`, and the bundled `docker compose` PostgreSQL does not need it.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
