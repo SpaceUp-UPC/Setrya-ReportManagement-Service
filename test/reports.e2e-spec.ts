@@ -136,6 +136,25 @@ describe('Reports (e2e)', () => {
 
       expect(res.body.requesterId).toBe(otherUser);
     });
+
+    it('accepts a token whose sub is an email, as issued by IAM', async () => {
+      const email = 'user@example.com';
+      const emailToken = await signToken({ sub: email });
+
+      const res = await anonymous()
+        .post(BASE)
+        .set('Authorization', `Bearer ${emailToken}`)
+        .send(payload())
+        .expect(201);
+
+      expect(res.body.requesterId).toBe(email);
+
+      const fetched = await anonymous()
+        .get(`${BASE}/${res.body.id}`)
+        .set('Authorization', `Bearer ${emailToken}`)
+        .expect(200);
+      expect(fetched.body.requesterId).toBe(email);
+    });
   });
 
   describe('authentication', () => {

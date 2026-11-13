@@ -71,11 +71,24 @@ describe('Reports with AUTH_DISABLED=true (e2e)', () => {
     expect(res.body.requesterId).toBe(requesterId);
   });
 
-  it('returns 400 when the body has no valid requesterId', async () => {
+  it('accepts any non-empty string as requesterId, such as an email', async () => {
+    const res = await request(app.getHttpServer())
+      .post(BASE)
+      .send(payload({ requesterId: 'user@example.com' }))
+      .expect(201);
+
+    expect(res.body.requesterId).toBe('user@example.com');
+  });
+
+  it('returns 400 when the body has no usable requesterId', async () => {
     await request(app.getHttpServer()).post(BASE).send(payload()).expect(400);
     await request(app.getHttpServer())
       .post(BASE)
-      .send(payload({ requesterId: 'nope' }))
+      .send(payload({ requesterId: '' }))
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(BASE)
+      .send(payload({ requesterId: 42 }))
       .expect(400);
   });
 });

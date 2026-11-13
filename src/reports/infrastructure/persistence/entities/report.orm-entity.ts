@@ -16,7 +16,7 @@ export class ReportOrmEntity {
   @Column({ name: 'type', type: 'enum', enum: ReportType })
   type: ReportType;
 
-  @Column({ name: 'requester_id', type: 'uuid' })
+  @Column({ name: 'requester_id', type: 'varchar' })
   requesterId: string;
 
   @Column({ name: 'space_id', type: 'uuid' })
