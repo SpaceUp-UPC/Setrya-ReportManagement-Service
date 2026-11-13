@@ -57,6 +57,29 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Run with Docker
+
+Builds the service image and starts it alongside PostgreSQL, running migrations automatically on startup.
+
+```bash
+$ cp .env.example .env
+$ docker compose up --build
+```
+
+The API is then available at `http://localhost:3000/api/v1`, and `http://localhost:3000/api/v1/health` should respond with `{"status":"ok"}`.
+
+To stop the stack:
+
+```bash
+$ docker compose down
+```
+
+To also remove the database and generated reports volumes:
+
+```bash
+$ docker compose down -v
+```
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
