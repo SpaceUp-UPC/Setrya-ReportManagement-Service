@@ -23,7 +23,9 @@
     "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/data-source.ts",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
-    "migration:generate": "npm run typeorm -- migration:generate"
+    "migration:generate": "npm run typeorm -- migration:generate",
+    "typeorm:prod": "node ./node_modules/typeorm/cli.js -d dist/data-source.js",
+    "migration:run:prod": "npm run typeorm:prod -- migration:run"
   },
   "dependencies": {
     "@nestjs/axios": "^12.0.1",
